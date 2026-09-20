@@ -2,7 +2,7 @@
 
 A minimalist, privacy-first Android macro and calorie tracker built with 100% Jetpack Compose and Room.
 
-**Zero ads. Zero subscriptions. Works 100% offline.**
+**Zero ads. Zero subscriptions. Works both online and offline.**
 
 [![Latest Release](https://img.shields.io/github/v/release/VamsiReddyBora/MacroBite?color=blue&label=Download%20APK)](https://github.com/VamsiReddyBora/MacroBite/releases/latest)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
