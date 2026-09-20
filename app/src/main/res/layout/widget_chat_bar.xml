@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:paddingStart="10dp"
+    android:paddingEnd="10dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp">
+
+    <!-- The Chat Text Box Container (Exact length, width, shape, and rotating outer ring) -->
+    <FrameLayout
+        android:id="@+id/widget_input_box"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/widget_bar_height"
+        android:layout_gravity="center">
+
+        <!-- Static Outer Ring -->
+        <ImageView
+            android:id="@+id/widget_static_border"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitXY"
+            android:src="@drawable/widget_border_amber_0" />
+
+        <!-- Interior Content: Bolt (leading), Text (placeholder), Mic + Camera (trailing) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
+
+            <!-- Bolt / AI Model Icon -->
+            <ImageView
+                android:id="@+id/widget_bolt_icon"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_bolt"
+                android:contentDescription="AI Model" />
+
+            <!-- Placeholder Text -->
+            <TextView
+                android:id="@+id/widget_placeholder_text"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:text="Describe a meal or ask anything..."
+                android:textColor="@color/widget_placeholder_text"
+                android:textSize="13sp"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <!-- Mic / Voice Button -->
+            <ImageView
+                android:id="@+id/widget_mic_button"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_mic"
+                android:contentDescription="Voice Input" />
+
+            <!-- Camera / Photo Button -->
+            <ImageView
+                android:id="@+id/widget_camera_button"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_camera"
+                android:contentDescription="Food Photo" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+</FrameLayout>

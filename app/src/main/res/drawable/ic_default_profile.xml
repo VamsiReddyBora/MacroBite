@@ -1,0 +1,18 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- WhatsApp-style neutral circular avatar background -->
+    <path
+        android:fillColor="#CFD8DC"
+        android:pathData="M24,24m-24,0a24,24 0,1 1,48 0a24,24 0,1 1,-48 0" />
+    <!-- Head silhouette -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,12a6,6 0,1 0,0 12a6,6 0,0 0,0 -12z" />
+    <!-- Torso / shoulders silhouette -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,27c-6.6,0 -12,4.4 -12,10.2v1.8h24v-1.8C36,31.4 30.6,27 24,27z" />
+</vector>

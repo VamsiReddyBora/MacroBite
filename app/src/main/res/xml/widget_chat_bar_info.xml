@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="52dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="1"
+    android:maxResizeWidth="560dp"
+    android:maxResizeHeight="80dp"
+    android:resizeMode="horizontal"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/widget_chat_bar"
+    android:description="@string/widget_chat_bar_description"
+    android:previewImage="@drawable/ic_launcher_foreground"
+    android:widgetCategory="home_screen" />

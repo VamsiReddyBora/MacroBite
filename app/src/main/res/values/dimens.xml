@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="widget_border_width">1.5dp</dimen>
+    <dimen name="widget_corner_radius">26dp</dimen>
+    <dimen name="widget_inner_radius">24.5dp</dimen>
+    <dimen name="widget_bar_height">52dp</dimen>
+</resources>

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 1. Base subtle border -->
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="26dp" />
+            <solid android:color="@color/widget_base_border" />
+        </shape>
+    </item>
+    <!-- 2. Rotating Accent Beam Gradient -->
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="26dp" />
+            <gradient
+                android:type="linear"
+                android:angle="135"
+                android:startColor="#10E11D48"
+                android:centerColor="#FFE11D48"
+                android:endColor="#10E11D48" />
+        </shape>
+    </item>
+    <!-- 3. Inner Pill Background Cutout -->
+    <item
+        android:left="1.5dp"
+        android:top="1.5dp"
+        android:right="1.5dp"
+        android:bottom="1.5dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="24.5dp" />
+            <solid android:color="@color/widget_container_bg" />
+        </shape>
+    </item>
+</layer-list>

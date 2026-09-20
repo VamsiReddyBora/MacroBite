@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">MacroBite</string>
+    <string name="widget_chat_bar_title">MacroBite Assistant</string>
+    <string name="widget_chat_bar_description">Quick AI assistant search, voice queries, and camera food logging.</string>
+</resources>
