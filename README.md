@@ -23,17 +23,18 @@ Or visit the **[Releases Tab](https://github.com/VamsiReddyBora/MacroBite/releas
 
 ## ⚡ Core Features
 
-- **Macro Gauge:** Segmented circular calorie ring (`/ 3,000 kcal`) with live progress bars for **Protein**, **Carbs**, and **Fats**.
-- **Multimodal Food Logging:** Log in seconds via natural language text (*"2 eggs and butter toast"*), speech-to-text with ripple feedback, camera photo capture, or 1-tap hostel Quick Presets.
-- **Barcode Scanner with Custom Barcode Memory:** Scans OpenFoodFacts barcodes. If an unknown product isn't found, snap its back-of-pack nutrition table once — MacroBite memorizes it locally and scans it instantly offline forever.
-- **Static Home Screen Chat & Voice Widget:** Type or speak meals directly from your home screen with glowing theme borders and zero screen flashing — logs silently in the background.
-- **Personal AI Assistant ("Raaya") & Device Copilot:** Atwater macro calculations and coaching, plus hands-free device actions: *"Call Mom"*, *"Set timer for 12 mins"*, *"WhatsApp Rahul"*, *"Open YouTube"*, *"Navigate to gym"*.
-- **Contact Aliases:** Map voice nicknames (e.g., `"dad" ➔ "Daddy"`) for instant phone dialing without disambiguation prompts.
-- **Smart Notifications & In-App HUD:** AI Well-Wisher meal reminders via exact Android alarms, floating spring HUD capsules, and a dedicated In-App Notification toggle in Settings.
-- **Google Health Connect & Body Tracker:** Synchronize daily steps and active calorie expenditure. Track body weight with trend delta and calculate BMI.
-- **Weekly Analytics & CSV Export:** 7-day intake chart against your target threshold and 1-tap CSV export for Google Sheets or Excel.
-- **6 Dynamic Theme Accents:** Amber Gold, Emerald Green, Cobalt Blue, Crimson Red, Amethyst Purple, and Slate Gray in Dark and Light modes.
-- **100% Privacy-First:** No analytics, no ads, and zero third-party telemetry. All data stays strictly on your device in a local SQLite database.
+| Feature | Capabilities | Key Advantage |
+| :--- | :--- | :--- |
+| 🎯 **Macro Gauge** | Segmented calorie ring (`/ 3,000 kcal`) + Protein, Carbs & Fats bars | Instant visual feedback on remaining macros |
+| 🎙️ **Multimodal Logging** | Plain text (*"2 eggs + toast"*), voice mic ripple, camera photos & 1-tap presets | Log any meal in 2–3 seconds |
+| 🏷️ **Barcode Memory** | OpenFoodFacts scanner + photo fallback for unlisted packages | Snapping an unknown label saves the barcode locally forever |
+| 📲 **Home Screen Widget** | Static home bar for background text & voice logging | Zero app launch, zero screen flash, silent background logging |
+| 🤖 **AI Assistant & Copilot** | Atwater nutrition calculations + hands-free actions (*Calls, Timers, WhatsApp, Maps*) | Nutrition intelligence + device automation in one |
+| 👥 **Contact Aliases** | Nickname mapping (e.g., `"dad"` ➔ `"Daddy"`) | Direct voice dialing without disambiguation prompts |
+| 🔔 **Smart Alerts & HUD** | AI Well-Wisher meal alarms + spring-animated floating capsules | Exact Android alarm timing + toggleable in-app HUD |
+| 👟 **Health & Analytics** | Health Connect sync (steps & burn), weight trends, BMI & CSV export | Unified offline fitness tracking & export to Excel |
+| 🎨 **6 Theme Accents** | Amber Gold, Emerald, Cobalt, Crimson, Amethyst & Slate | Tailored Material 3 Dark & Light modes |
+| 🔒 **100% Privacy-First** | Local SQLite Room DB + encrypted Jetpack DataStore | Zero ads, zero trackers, zero telemetry |
 
 ---
 
