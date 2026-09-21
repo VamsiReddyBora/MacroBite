@@ -83,6 +83,8 @@ class UserPreferencesRepositoryImpl @Inject constructor(
         val CUSTOM_MODELS = stringSetPreferencesKey("custom_models")
         val AUTO_BACKUP = booleanPreferencesKey("auto_backup")
         val CUSTOM_BARCODES_JSON = stringPreferencesKey("custom_barcodes_json")
+        val EXTERNAL_REQUEST_DATE = stringPreferencesKey("external_request_date")
+        val EXTERNAL_REQUEST_COUNT = intPreferencesKey("external_request_count")
     }
 
     private val safePreferencesFlow: Flow<Preferences> = context.dataStore.data
@@ -169,19 +171,36 @@ class UserPreferencesRepositoryImpl @Inject constructor(
         val today = AppDate.todayIso()
         return safePreferencesFlow.map { preferences ->
             val storedDate = preferences[PreferencesKeys.DAILY_USAGE_DATE] ?: ""
+            val model = preferences[PreferencesKeys.GEMINI_MODEL] ?: "gemini-3.5-flash-lite"
+            val dailyLimit = when {
+                model.contains("flash-lite", ignoreCase = true) -> 500
+                model.contains("flash", ignoreCase = true) -> 20
+                else -> 500
+            }
+            val storedExtDate = preferences[PreferencesKeys.EXTERNAL_REQUEST_DATE] ?: ""
+            val extRequests = if (storedExtDate == today) {
+                preferences[PreferencesKeys.EXTERNAL_REQUEST_COUNT] ?: 0
+            } else 0
+
             if (storedDate == today) {
                 DailyApiUsage(
                     date = today,
                     totalTokens = preferences[PreferencesKeys.DAILY_USAGE_TOTAL_TOKENS] ?: 0,
                     promptTokens = preferences[PreferencesKeys.DAILY_USAGE_PROMPT_TOKENS] ?: 0,
                     candidateTokens = preferences[PreferencesKeys.DAILY_USAGE_CANDIDATE_TOKENS] ?: 0,
-                    requestCount = preferences[PreferencesKeys.DAILY_USAGE_REQUEST_COUNT] ?: 0
+                    requestCount = preferences[PreferencesKeys.DAILY_USAGE_REQUEST_COUNT] ?: 0,
+                    externalRequestCount = extRequests,
+                    dailyLimit = dailyLimit
                 )
             } else {
-                DailyApiUsage(date = today)
+                DailyApiUsage(
+                    date = today,
+                    externalRequestCount = extRequests,
+                    dailyLimit = dailyLimit
+                )
             }
         }.catch {
-            emit(DailyApiUsage(date = today))
+            emit(DailyApiUsage(date = today, dailyLimit = 500))
         }
     }
 
@@ -247,12 +266,52 @@ class UserPreferencesRepositoryImpl @Inject constructor(
                 preferences[PreferencesKeys.DAILY_USAGE_PROMPT_TOKENS] = 0
                 preferences[PreferencesKeys.DAILY_USAGE_CANDIDATE_TOKENS] = 0
                 preferences[PreferencesKeys.DAILY_USAGE_REQUEST_COUNT] = 0
+                preferences[PreferencesKeys.EXTERNAL_REQUEST_DATE] = today
+                preferences[PreferencesKeys.EXTERNAL_REQUEST_COUNT] = 0
                 preferences.remove(PreferencesKeys.TOKEN_ALERT_NOTIFIED_50_DATE)
                 preferences.remove(PreferencesKeys.TOKEN_ALERT_NOTIFIED_75_DATE)
                 preferences.remove(PreferencesKeys.TOKEN_ALERT_NOTIFIED_90_DATE)
             }
         } catch (e: Throwable) {
             Log.e("UserPrefs", "Failed to reset today's API usage", e)
+        }
+    }
+
+    override fun getExternalRequestOffset(): Flow<Int> {
+        val today = AppDate.todayIso()
+        return safePreferencesFlow.map { preferences ->
+            val storedDate = preferences[PreferencesKeys.EXTERNAL_REQUEST_DATE] ?: ""
+            if (storedDate == today) {
+                preferences[PreferencesKeys.EXTERNAL_REQUEST_COUNT] ?: 0
+            } else 0
+        }.catch { emit(0) }
+    }
+
+    override suspend fun setExternalRequestOffset(offset: Int) {
+        try {
+            val today = AppDate.todayIso()
+            context.dataStore.edit { preferences ->
+                preferences[PreferencesKeys.EXTERNAL_REQUEST_DATE] = today
+                preferences[PreferencesKeys.EXTERNAL_REQUEST_COUNT] = offset.coerceAtLeast(0)
+            }
+        } catch (e: Throwable) {
+            Log.e("UserPrefs", "Failed to set external request count", e)
+        }
+    }
+
+    override suspend fun addExternalRequests(delta: Int) {
+        try {
+            val today = AppDate.todayIso()
+            context.dataStore.edit { preferences ->
+                val storedDate = preferences[PreferencesKeys.EXTERNAL_REQUEST_DATE] ?: ""
+                val current = if (storedDate == today) {
+                    preferences[PreferencesKeys.EXTERNAL_REQUEST_COUNT] ?: 0
+                } else 0
+                preferences[PreferencesKeys.EXTERNAL_REQUEST_DATE] = today
+                preferences[PreferencesKeys.EXTERNAL_REQUEST_COUNT] = (current + delta).coerceAtLeast(0)
+            }
+        } catch (e: Throwable) {
+            Log.e("UserPrefs", "Failed to add external requests", e)
         }
     }
 

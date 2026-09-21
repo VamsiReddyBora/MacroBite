@@ -15,7 +15,10 @@ class DailyApiUsageTest {
         assertEquals(0, usage.promptTokens)
         assertEquals(0, usage.candidateTokens)
         assertEquals(0, usage.requestCount)
-        assertEquals(1500, usage.estimatedRemainingRequests)
+        assertEquals(0, usage.externalRequestCount)
+        assertEquals(500, usage.dailyLimit)
+        assertEquals(0, usage.totalRequestCount)
+        assertEquals(500, usage.estimatedRemainingRequests)
         assertEquals(0f, usage.usagePercentage, 0.001f)
         assertEquals(0, usage.averageTokensPerRequest)
     }
@@ -27,11 +30,41 @@ class DailyApiUsageTest {
             totalTokens = 15000,
             promptTokens = 11000,
             candidateTokens = 4000,
-            requestCount = 10
+            requestCount = 10,
+            externalRequestCount = 0,
+            dailyLimit = 500
         )
-        assertEquals(1490, usage.estimatedRemainingRequests)
+        assertEquals(490, usage.estimatedRemainingRequests)
         assertEquals(1500, usage.averageTokensPerRequest)
-        assertEquals(10f / 1500f, usage.usagePercentage, 0.0001f)
+        assertEquals(10f / 500f, usage.usagePercentage, 0.0001f)
+    }
+
+    @Test
+    fun testCrossAppExternalRequestTracking() {
+        // App used 1 request, another app or AI studio used 2 requests
+        val usage = DailyApiUsage(
+            date = "2026-09-16",
+            totalTokens = 1200,
+            requestCount = 1,
+            externalRequestCount = 2,
+            dailyLimit = 500
+        )
+        assertEquals(3, usage.totalRequestCount)
+        assertEquals(497, usage.estimatedRemainingRequests)
+        assertEquals(3f / 500f, usage.usagePercentage, 0.0001f)
+    }
+
+    @Test
+    fun testStandardFlashTwentyRpdCap() {
+        val usage = DailyApiUsage(
+            date = "2026-09-16",
+            requestCount = 15,
+            externalRequestCount = 6,
+            dailyLimit = 20
+        )
+        assertEquals(21, usage.totalRequestCount)
+        assertEquals(0, usage.estimatedRemainingRequests)
+        assertEquals(1.0f, usage.usagePercentage, 0.0001f)
     }
 
     @Test
@@ -41,7 +74,8 @@ class DailyApiUsageTest {
             totalTokens = 2000000,
             promptTokens = 1500000,
             candidateTokens = 500000,
-            requestCount = 1600
+            requestCount = 600,
+            dailyLimit = 500
         )
         assertEquals(0, usage.estimatedRemainingRequests)
         assertEquals(1.0f, usage.usagePercentage, 0.0001f)

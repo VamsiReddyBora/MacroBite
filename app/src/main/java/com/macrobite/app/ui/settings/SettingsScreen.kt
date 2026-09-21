@@ -100,39 +100,57 @@ private data class ParsingEngineOption(
     val id: String,
     val title: String,
     val subtitle: String,
-    val isCloud: Boolean
+    val isCloud: Boolean,
+    val isRecommended: Boolean = false,
+    val badge: String = "",
+    val quotaText: String = ""
 )
 
 private val parsingEngineOptions = listOf(
     ParsingEngineOption(
         id = "gemini-3.5-flash-lite",
         title = "Gemini 3.5 Flash-Lite",
-        subtitle = "Tested & Verified · High speed & low latency",
-        isCloud = true
+        subtitle = "Fastest speed · High 500 RPD quota · 15 RPM",
+        isCloud = true,
+        isRecommended = true,
+        badge = "Recommended",
+        quotaText = "500 RPD · 15 RPM"
     ),
     ParsingEngineOption(
         id = "gemini-3.1-flash-lite",
         title = "Gemini 3.1 Flash-Lite",
-        subtitle = "Tested & Verified · Lightweight & reliable",
-        isCloud = true
+        subtitle = "Stable & lightweight · 500 RPD quota · 15 RPM",
+        isCloud = true,
+        isRecommended = true,
+        badge = "Recommended",
+        quotaText = "500 RPD · 15 RPM"
     ),
     ParsingEngineOption(
         id = "gemini-3.5-flash",
         title = "Gemini 3.5 Flash",
-        subtitle = "Tested · Multimodal Flash (20 RPD cap)",
-        isCloud = true
+        subtitle = "Standard Flash · Strict 20 RPD cap · 5 RPM",
+        isCloud = true,
+        isRecommended = false,
+        badge = "20 RPD Cap",
+        quotaText = "20 RPD · 5 RPM"
     ),
     ParsingEngineOption(
         id = "gemini-3.6-flash",
         title = "Gemini 3.6 Flash",
-        subtitle = "Tested · Standard Flash (20 RPD cap)",
-        isCloud = true
+        subtitle = "Standard Flash · Strict 20 RPD cap · 5 RPM",
+        isCloud = true,
+        isRecommended = false,
+        badge = "20 RPD Cap",
+        quotaText = "20 RPD · 5 RPM"
     ),
     ParsingEngineOption(
         id = "offline-local",
         title = "Offline Local Database",
         subtitle = "Zero internet · Built-in food catalog",
-        isCloud = false
+        isCloud = false,
+        isRecommended = false,
+        badge = "Offline",
+        quotaText = "Unlimited"
     )
 )
 
@@ -728,19 +746,24 @@ fun SettingsScreen(
                                                                 fontSize = 14.sp,
                                                                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                                             )
-                                                            if (option.id == "gemini-3.5-flash-lite") {
+                                                            if (option.badge.isNotBlank()) {
                                                                 Spacer(modifier = Modifier.width(6.dp))
+                                                                val (badgeBg, badgeFg) = when {
+                                                                    option.isRecommended -> CarbsGreen.copy(alpha = 0.15f) to CarbsGreen
+                                                                    option.badge.contains("Cap") -> FatsCoral.copy(alpha = 0.15f) to FatsCoral
+                                                                    else -> ProteinBlue.copy(alpha = 0.15f) to ProteinBlue
+                                                                }
                                                                 Box(
                                                                     modifier = Modifier
                                                                         .clip(RoundedCornerShape(4.dp))
-                                                                        .background(CarbsGreen.copy(alpha = 0.15f))
-                                                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                                                        .background(badgeBg)
+                                                                        .padding(horizontal = 5.dp, vertical = 2.dp)
                                                                 ) {
                                                                     Text(
-                                                                        text = "Default",
+                                                                        text = option.badge,
                                                                         fontSize = 9.sp,
                                                                         fontWeight = FontWeight.Bold,
-                                                                        color = CarbsGreen
+                                                                        color = badgeFg
                                                                     )
                                                                 }
                                                             }
@@ -904,6 +927,10 @@ fun SettingsScreen(
             item {
                 GeminiApiUsageCard(
                     usage = dailyApiUsage,
+                    activeModel = geminiModel,
+                    onAddExternalRequests = { viewModel.addExternalRequests(it) },
+                    onSetExternalRequests = { viewModel.setExternalRequestCount(it) },
+                    onResetUsage = { viewModel.resetTodayApiUsage() },
                     isScreenActive = isScreenActive
                 )
             }

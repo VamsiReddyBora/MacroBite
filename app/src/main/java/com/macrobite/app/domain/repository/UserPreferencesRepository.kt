@@ -16,6 +16,9 @@ interface UserPreferencesRepository {
     fun getDailyApiUsage(): Flow<DailyApiUsage>
     suspend fun recordApiUsage(promptTokens: Int, candidateTokens: Int, totalTokens: Int)
     suspend fun resetTodayApiUsage()
+    fun getExternalRequestOffset(): Flow<Int>
+    suspend fun setExternalRequestOffset(offset: Int)
+    suspend fun addExternalRequests(delta: Int)
     fun getGeminiModel(): Flow<String>
     suspend fun setGeminiModel(model: String)
     fun getThemeColor(): Flow<String>

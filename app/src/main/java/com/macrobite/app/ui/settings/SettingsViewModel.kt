@@ -276,6 +276,21 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun setExternalRequestCount(count: Int) {
+        viewModelScope.launch {
+            userPreferencesRepository.setExternalRequestOffset(count)
+            _saveMessage.value = "External requests updated to $count"
+        }
+    }
+
+    fun addExternalRequests(delta: Int) {
+        viewModelScope.launch {
+            userPreferencesRepository.addExternalRequests(delta)
+            val sign = if (delta >= 0) "+$delta" else "$delta"
+            _saveMessage.value = "Adjusted external usage by $sign"
+        }
+    }
+
     fun setDarkMode(mode: String) {
         viewModelScope.launch {
             userPreferencesRepository.setDarkModePreference(mode)
