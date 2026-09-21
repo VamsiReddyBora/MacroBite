@@ -16,6 +16,9 @@ interface ChatDao {
     @Query("SELECT * FROM chat_messages ORDER BY timestamp ASC")
     fun getAllMessages(): Flow<List<ChatMessageEntity>>
 
+    @Query("SELECT * FROM chat_messages ORDER BY timestamp ASC")
+    suspend fun getAllMessagesDirect(): List<ChatMessageEntity>
+
     @Query("SELECT DISTINCT chatDate FROM chat_messages ORDER BY chatDate DESC")
     fun getDistinctChatDates(): Flow<List<String>>
 

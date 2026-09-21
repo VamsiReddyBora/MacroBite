@@ -24,6 +24,10 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -193,11 +197,36 @@ class UserPreferencesRepositoryImpl @Inject constructor(
                     dailyLimit = dailyLimit
                 )
             } else {
-                DailyApiUsage(
-                    date = today,
-                    externalRequestCount = extRequests,
-                    dailyLimit = dailyLimit
-                )
+                // Check if we have persistent backup from today across app reinstall
+                val backup = readPersistentQuotaBackup()
+                if (backup != null && backup["date"] == today) {
+                    val totalTokens = (backup["totalTokens"] as? Number)?.toInt() ?: 0
+                    val promptTokens = (backup["promptTokens"] as? Number)?.toInt() ?: 0
+                    val candidateTokens = (backup["candidateTokens"] as? Number)?.toInt() ?: 0
+                    val reqCount = (backup["requestCount"] as? Number)?.toInt() ?: 0
+                    val extReqs = (backup["externalRequests"] as? Number)?.toInt() ?: extRequests
+
+                    // Asynchronously sync into DataStore
+                    CoroutineScope(Dispatchers.IO).launch {
+                        restoreApiUsage(today, promptTokens, candidateTokens, totalTokens, reqCount, extReqs)
+                    }
+
+                    DailyApiUsage(
+                        date = today,
+                        totalTokens = totalTokens,
+                        promptTokens = promptTokens,
+                        candidateTokens = candidateTokens,
+                        requestCount = reqCount,
+                        externalRequestCount = extReqs,
+                        dailyLimit = dailyLimit
+                    )
+                } else {
+                    DailyApiUsage(
+                        date = today,
+                        externalRequestCount = extRequests,
+                        dailyLimit = dailyLimit
+                    )
+                }
             }
         }.catch {
             emit(DailyApiUsage(date = today, dailyLimit = 500))
@@ -251,6 +280,11 @@ class UserPreferencesRepositoryImpl @Inject constructor(
                         NotificationHelper.showTokenUsageAlert(context, 50, finalTotal, alertLimit, finalRequests)
                     }
                 }
+
+                val finalPrompt = preferences[PreferencesKeys.DAILY_USAGE_PROMPT_TOKENS] ?: 0
+                val finalCand = preferences[PreferencesKeys.DAILY_USAGE_CANDIDATE_TOKENS] ?: 0
+                val extRequests = preferences[PreferencesKeys.EXTERNAL_REQUEST_COUNT] ?: 0
+                savePersistentQuotaBackup(today, finalPrompt, finalCand, preferences[PreferencesKeys.DAILY_USAGE_TOTAL_TOKENS] ?: 0, preferences[PreferencesKeys.DAILY_USAGE_REQUEST_COUNT] ?: 0, extRequests)
             }
         } catch (e: Throwable) {
             Log.e("UserPrefs", "Failed to record API usage", e)
@@ -291,8 +325,14 @@ class UserPreferencesRepositoryImpl @Inject constructor(
         try {
             val today = AppDate.todayIso()
             context.dataStore.edit { preferences ->
+                val newCount = offset.coerceAtLeast(0)
                 preferences[PreferencesKeys.EXTERNAL_REQUEST_DATE] = today
-                preferences[PreferencesKeys.EXTERNAL_REQUEST_COUNT] = offset.coerceAtLeast(0)
+                preferences[PreferencesKeys.EXTERNAL_REQUEST_COUNT] = newCount
+                val prompt = preferences[PreferencesKeys.DAILY_USAGE_PROMPT_TOKENS] ?: 0
+                val cand = preferences[PreferencesKeys.DAILY_USAGE_CANDIDATE_TOKENS] ?: 0
+                val total = preferences[PreferencesKeys.DAILY_USAGE_TOTAL_TOKENS] ?: 0
+                val reqs = preferences[PreferencesKeys.DAILY_USAGE_REQUEST_COUNT] ?: 0
+                savePersistentQuotaBackup(today, prompt, cand, total, reqs, newCount)
             }
         } catch (e: Throwable) {
             Log.e("UserPrefs", "Failed to set external request count", e)
@@ -307,8 +347,14 @@ class UserPreferencesRepositoryImpl @Inject constructor(
                 val current = if (storedDate == today) {
                     preferences[PreferencesKeys.EXTERNAL_REQUEST_COUNT] ?: 0
                 } else 0
+                val newCount = (current + delta).coerceAtLeast(0)
                 preferences[PreferencesKeys.EXTERNAL_REQUEST_DATE] = today
-                preferences[PreferencesKeys.EXTERNAL_REQUEST_COUNT] = (current + delta).coerceAtLeast(0)
+                preferences[PreferencesKeys.EXTERNAL_REQUEST_COUNT] = newCount
+                val prompt = preferences[PreferencesKeys.DAILY_USAGE_PROMPT_TOKENS] ?: 0
+                val cand = preferences[PreferencesKeys.DAILY_USAGE_CANDIDATE_TOKENS] ?: 0
+                val total = preferences[PreferencesKeys.DAILY_USAGE_TOTAL_TOKENS] ?: 0
+                val reqs = preferences[PreferencesKeys.DAILY_USAGE_REQUEST_COUNT] ?: 0
+                savePersistentQuotaBackup(today, prompt, cand, total, reqs, newCount)
             }
         } catch (e: Throwable) {
             Log.e("UserPrefs", "Failed to add external requests", e)
@@ -854,6 +900,71 @@ class UserPreferencesRepositoryImpl @Inject constructor(
         } catch (e: Throwable) {
             Log.e("UserPrefs", "Failed to save custom barcode", e)
         }
+    }
+
+    override suspend fun saveAllContactAliases(aliases: Map<String, String>) {
+        try {
+            context.dataStore.edit { prefs ->
+                prefs[PreferencesKeys.CONTACT_ALIASES_JSON] = Gson().toJson(aliases)
+            }
+        } catch (e: Throwable) {
+            Log.e("UserPrefs", "Failed to save all contact aliases", e)
+        }
+    }
+
+    override suspend fun saveAllCustomBarcodes(barcodes: Map<String, String>) {
+        try {
+            context.dataStore.edit { prefs ->
+                prefs[PreferencesKeys.CUSTOM_BARCODES_JSON] = Gson().toJson(barcodes)
+            }
+        } catch (e: Throwable) {
+            Log.e("UserPrefs", "Failed to save all custom barcodes", e)
+        }
+    }
+
+    override suspend fun restoreApiUsage(date: String, promptTokens: Int, candidateTokens: Int, totalTokens: Int, requests: Int, externalRequests: Int) {
+        try {
+            val targetDate = if (date.isNotBlank()) date else AppDate.todayIso()
+            context.dataStore.edit { prefs ->
+                prefs[PreferencesKeys.DAILY_USAGE_DATE] = targetDate
+                prefs[PreferencesKeys.DAILY_USAGE_PROMPT_TOKENS] = promptTokens.coerceAtLeast(0)
+                prefs[PreferencesKeys.DAILY_USAGE_CANDIDATE_TOKENS] = candidateTokens.coerceAtLeast(0)
+                prefs[PreferencesKeys.DAILY_USAGE_TOTAL_TOKENS] = totalTokens.coerceAtLeast(0)
+                prefs[PreferencesKeys.DAILY_USAGE_REQUEST_COUNT] = requests.coerceAtLeast(0)
+                prefs[PreferencesKeys.EXTERNAL_REQUEST_DATE] = targetDate
+                prefs[PreferencesKeys.EXTERNAL_REQUEST_COUNT] = externalRequests.coerceAtLeast(0)
+            }
+            savePersistentQuotaBackup(targetDate, promptTokens, candidateTokens, totalTokens, requests, externalRequests)
+        } catch (e: Throwable) {
+            Log.e("UserPrefs", "Failed to restore API usage", e)
+        }
+    }
+
+    private fun savePersistentQuotaBackup(date: String, promptTokens: Int, candidateTokens: Int, totalTokens: Int, requestCount: Int, externalRequests: Int) {
+        val json = """{"date":"$date","promptTokens":$promptTokens,"candidateTokens":$candidateTokens,"totalTokens":$totalTokens,"requestCount":$requestCount,"externalRequests":$externalRequests}"""
+        try {
+            val dir = File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOCUMENTS), "MacroBite")
+            if (!dir.exists()) dir.mkdirs()
+            val file = File(dir, ".daily_api_sync.json")
+            file.writeText(json)
+        } catch (_: Throwable) {}
+        try {
+            val internalFile = File(context.filesDir, ".daily_api_sync.json")
+            internalFile.writeText(json)
+        } catch (_: Throwable) {}
+    }
+
+    private fun readPersistentQuotaBackup(): Map<String, Any>? {
+        return try {
+            val dir = File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOCUMENTS), "MacroBite")
+            val extFile = File(dir, ".daily_api_sync.json")
+            val targetFile = if (extFile.exists()) extFile else File(context.filesDir, ".daily_api_sync.json")
+            if (targetFile.exists()) {
+                val json = targetFile.readText()
+                val type = object : TypeToken<Map<String, Any>>() {}.type
+                Gson().fromJson<Map<String, Any>>(json, type)
+            } else null
+        } catch (_: Throwable) { null }
     }
 }
 

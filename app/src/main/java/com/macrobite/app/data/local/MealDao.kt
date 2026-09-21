@@ -19,6 +19,9 @@ interface MealDao {
     @Query("SELECT * FROM meals ORDER BY date DESC, timestamp DESC")
     fun getAllMeals(): Flow<List<MealEntity>>
 
+    @Query("SELECT * FROM meals ORDER BY date DESC, timestamp DESC")
+    suspend fun getAllMealsDirect(): List<MealEntity>
+
     @Query("SELECT * FROM meals WHERE id = :id LIMIT 1")
     suspend fun getMealById(id: Long): MealEntity?
 

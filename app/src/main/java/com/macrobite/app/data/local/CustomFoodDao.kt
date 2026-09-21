@@ -12,6 +12,9 @@ interface CustomFoodDao {
     @Query("SELECT * FROM custom_foods ORDER BY id ASC")
     fun getAllCustomFoods(): Flow<List<CustomFoodEntity>>
 
+    @Query("SELECT * FROM custom_foods ORDER BY id ASC")
+    suspend fun getAllCustomFoodsDirect(): List<CustomFoodEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCustomFood(food: CustomFoodEntity): Long
 

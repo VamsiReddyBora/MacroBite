@@ -1306,17 +1306,33 @@ fun SettingsScreen(
 
                                 Spacer(modifier = Modifier.height(8.dp))
 
-                                // Button 3: Restore Backup (File picker)
+                                // Button 3: Restore Backup (Auto-detects from phone storage without file manager)
                                 OutlinedButton(
                                     onClick = {
-                                        restoreFilePickerLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                                        viewModel.restoreLatestBackupAuto()
                                     },
                                     shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Icon(painter = painterResource(id = R.drawable.ic_refresh), contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Restore from Backup File...", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                    Text("Restore Latest Backup", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
+
+                                Spacer(modifier = Modifier.height(2.dp))
+
+                                TextButton(
+                                    onClick = {
+                                        restoreFilePickerLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                                    },
+                                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "Or choose backup file manually from File Manager",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
 
                                 backupStatus?.let { status ->

@@ -82,5 +82,10 @@ interface UserPreferencesRepository {
     // Custom Barcodes Memory
     fun getCustomBarcodes(): Flow<Map<String, String>>
     suspend fun saveCustomBarcode(barcode: String, resultJson: String)
+
+    // Full Restore Bulk Setters
+    suspend fun saveAllContactAliases(aliases: Map<String, String>)
+    suspend fun saveAllCustomBarcodes(barcodes: Map<String, String>)
+    suspend fun restoreApiUsage(date: String, promptTokens: Int, candidateTokens: Int, totalTokens: Int, requests: Int, externalRequests: Int)
 }
 

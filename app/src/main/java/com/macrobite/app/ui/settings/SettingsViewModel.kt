@@ -190,6 +190,15 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun restoreLatestBackupAuto() {
+        viewModelScope.launch {
+            _backupStatus.value = "Scanning phone storage for latest backup..."
+            val result = backupManager.restoreLatestBackupAuto()
+            _backupStatus.value = result.message
+            _saveMessage.value = result.message
+        }
+    }
+
     fun setUseGemini(enabled: Boolean) {
         viewModelScope.launch {
             userPreferencesRepository.setUseGemini(enabled)

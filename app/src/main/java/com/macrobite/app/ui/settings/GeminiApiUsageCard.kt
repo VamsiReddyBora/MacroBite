@@ -164,7 +164,6 @@ fun GeminiApiUsageCard(
     var isExpanded by remember { mutableStateOf(false) }
     var showCustomDialog by remember { mutableStateOf(false) }
     var customCountInput by remember { mutableStateOf("") }
-    var showResetConfirmDialog by remember { mutableStateOf(false) }
 
     val numberFmt = remember { NumberFormat.getNumberInstance(Locale.US) }
     val uriHandler = LocalUriHandler.current
@@ -860,32 +859,48 @@ fun GeminiApiUsageCard(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // SECTION 4: Reset & Information
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    // SECTION 4: Official Quota Policy & Automatic Midnight Reset
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                            .border(
+                                BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                                RoundedCornerShape(10.dp)
+                            )
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
                     ) {
-                        OutlinedButton(
-                            onClick = { showResetConfirmDialog = true },
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                painter = painterResource(id = R.drawable.ic_refresh),
+                                imageVector = Icons.Default.Info,
                                 contentDescription = null,
-                                modifier = Modifier.size(14.dp)
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Reset Today's Stats", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "Official Google AI Studio Quota",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.5.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Quota is linked to your Google API account. Stats cannot be manually cleared and auto-refresh daily at 00:00 UTC / Midnight.",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 10.sp,
+                                        lineHeight = 13.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
-
-                        Text(
-                            text = "Auto-resets daily at 00:00",
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 }
             }
@@ -935,43 +950,6 @@ fun GeminiApiUsageCard(
             },
             dismissButton = {
                 TextButton(onClick = { showCustomDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-
-    // Reset Confirmation Dialog
-    if (showResetConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = { showResetConfirmDialog = false },
-            title = {
-                Text(
-                    text = "Reset Daily API Counters?",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
-            },
-            text = {
-                Text(
-                    text = "This will reset your tracked token count, internal MacroBite requests, and external sync count for today back to zero.",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        onResetUsage()
-                        showResetConfirmDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Reset")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showResetConfirmDialog = false }) {
                     Text("Cancel")
                 }
             }

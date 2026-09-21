@@ -12,6 +12,9 @@ interface WeightDao {
     @Query("SELECT * FROM weight_logs ORDER BY date ASC, timestamp ASC")
     fun getAllWeights(): Flow<List<WeightEntity>>
 
+    @Query("SELECT * FROM weight_logs ORDER BY date ASC, timestamp ASC")
+    suspend fun getAllWeightsDirect(): List<WeightEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWeight(weight: WeightEntity): Long
 
