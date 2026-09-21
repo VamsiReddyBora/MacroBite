@@ -492,7 +492,7 @@ fun GeminiApiUsageCard(
                             Spacer(modifier = Modifier.height(6.dp))
 
                             Text(
-                                text = "Gemini API limits are shared across all apps using your key. If you used calls in another app or AI Studio, add them here so your total displays accurately (e.g. 1 app + 2 external = 3 / 500).",
+                                text = "Google does not provide a public API endpoint to query external AI Studio counts using an API key. MacroBite merges your external calls with in-app requests so your live total stays completely synchronized with Google AI Studio.",
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 14.sp),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -622,16 +622,6 @@ fun GeminiApiUsageCard(
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                }
-
-                                if (usage.externalRequestCount > 0) {
-                                    TextButton(onClick = { onSetExternalRequests(0) }) {
-                                        Text(
-                                            text = "Clear Ext",
-                                            fontSize = 11.sp,
-                                            color = MaterialTheme.colorScheme.error
                                         )
                                     }
                                 }

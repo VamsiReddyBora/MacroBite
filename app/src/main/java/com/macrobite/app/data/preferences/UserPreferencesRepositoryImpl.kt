@@ -183,8 +183,13 @@ class UserPreferencesRepositoryImpl @Inject constructor(
             }
             val storedExtDate = preferences[PreferencesKeys.EXTERNAL_REQUEST_DATE] ?: ""
             val extRequests = if (storedExtDate == today) {
-                preferences[PreferencesKeys.EXTERNAL_REQUEST_COUNT] ?: 0
-            } else 0
+                preferences[PreferencesKeys.EXTERNAL_REQUEST_COUNT] ?: 40
+            } else {
+                val backup = readPersistentQuotaBackup()
+                if (backup != null && backup["date"] == today) {
+                    (backup["externalRequests"] as? Number)?.toInt() ?: 40
+                } else 40
+            }
 
             if (storedDate == today) {
                 DailyApiUsage(
@@ -316,9 +321,9 @@ class UserPreferencesRepositoryImpl @Inject constructor(
         return safePreferencesFlow.map { preferences ->
             val storedDate = preferences[PreferencesKeys.EXTERNAL_REQUEST_DATE] ?: ""
             if (storedDate == today) {
-                preferences[PreferencesKeys.EXTERNAL_REQUEST_COUNT] ?: 0
-            } else 0
-        }.catch { emit(0) }
+                preferences[PreferencesKeys.EXTERNAL_REQUEST_COUNT] ?: 40
+            } else 40
+        }.catch { emit(40) }
     }
 
     override suspend fun setExternalRequestOffset(offset: Int) {
