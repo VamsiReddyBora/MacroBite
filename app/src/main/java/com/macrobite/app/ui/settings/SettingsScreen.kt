@@ -164,6 +164,9 @@ fun SettingsScreen(
     val targets by viewModel.targets.collectAsState()
     val useGemini by viewModel.useGemini.collectAsState()
     val geminiApiKey by viewModel.geminiApiKey.collectAsState()
+    val customApiBaseUrl by viewModel.customApiBaseUrl.collectAsState()
+    val customApiModel by viewModel.customApiModel.collectAsState()
+
     val geminiModel by viewModel.geminiModel.collectAsState()
     val darkModePref by viewModel.darkModePreference.collectAsState()
     val themeColorPref by viewModel.themeColorPreference.collectAsState()
@@ -273,6 +276,9 @@ fun SettingsScreen(
 
     // API key edit state
     var keyInput by remember(geminiApiKey) { mutableStateOf(geminiApiKey) }
+    var baseUrlInput by remember(customApiBaseUrl) { mutableStateOf(customApiBaseUrl) }
+    var modelInput by remember(customApiModel) { mutableStateOf(customApiModel) }
+
     var showApiKey by remember { mutableStateOf(false) }
 
     LaunchedEffect(saveMessage) {
@@ -850,6 +856,29 @@ fun SettingsScreen(
                                     modifier = Modifier.fillMaxWidth()
                                 )
 
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text("Custom OpenAI-Compatible API (Optional)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    value = baseUrlInput,
+                                    onValueChange = { baseUrlInput = it },
+                                    label = { Text("Custom Base URL") },
+                                    placeholder = { Text("http://<tailscale-ip>:8000/v1") },
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    value = modelInput,
+                                    onValueChange = { modelInput = it },
+                                    label = { Text("Custom Model Name") },
+                                    placeholder = { Text("Gemini 3.8 Flash (Low)") },
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
                                 Spacer(modifier = Modifier.height(8.dp))
 
                                 // Paste button
@@ -880,6 +909,9 @@ fun SettingsScreen(
                                     Button(
                                         onClick = {
                                             viewModel.saveGeminiApiKey(keyInput)
+                                        viewModel.setCustomApiBaseUrl(baseUrlInput)
+                                        viewModel.setCustomApiModel(modelInput)
+
                                         },
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = MaterialTheme.colorScheme.primary,
@@ -895,7 +927,7 @@ fun SettingsScreen(
 
                                     OutlinedButton(
                                         onClick = {
-                                            viewModel.testGeminiConnection(keyInput)
+                                            viewModel.testGeminiConnection(keyInput, baseUrlInput, modelInput)
                                         },
                                         enabled = !isTestingApi && keyInput.isNotBlank(),
                                         shape = RoundedCornerShape(10.dp),
@@ -925,12 +957,20 @@ fun SettingsScreen(
 
             // Gemini API Quota & Daily Token Usage
             item {
+                val liveQuotaStatus by viewModel.liveQuotaStatus.collectAsState()
+
+                // Auto-probe when settings screen is active
+                LaunchedEffect(isScreenActive) {
+                    if (isScreenActive) {
+                        viewModel.refreshLiveQuotaStatus()
+                    }
+                }
+
                 GeminiApiUsageCard(
                     usage = dailyApiUsage,
                     activeModel = geminiModel,
-                    onAddExternalRequests = { viewModel.addExternalRequests(it) },
-                    onSetExternalRequests = { viewModel.setExternalRequestCount(it) },
-                    onResetUsage = { viewModel.resetTodayApiUsage() },
+                    onRefreshQuota = { viewModel.refreshLiveQuotaStatus() },
+                    liveQuotaStatus = liveQuotaStatus,
                     isScreenActive = isScreenActive
                 )
             }

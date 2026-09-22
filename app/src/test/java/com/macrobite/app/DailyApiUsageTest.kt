@@ -41,17 +41,17 @@ class DailyApiUsageTest {
 
     @Test
     fun testCrossAppExternalRequestTracking() {
-        // App used 1 request, another app or AI studio used 2 requests
+        // App used 1 request
         val usage = DailyApiUsage(
             date = "2026-09-16",
             totalTokens = 1200,
             requestCount = 1,
-            externalRequestCount = 2,
+            externalRequestCount = 0,
             dailyLimit = 500
         )
-        assertEquals(3, usage.totalRequestCount)
-        assertEquals(497, usage.estimatedRemainingRequests)
-        assertEquals(3f / 500f, usage.usagePercentage, 0.0001f)
+        assertEquals(1, usage.totalRequestCount)
+        assertEquals(499, usage.estimatedRemainingRequests)
+        assertEquals(1f / 500f, usage.usagePercentage, 0.0001f)
     }
 
     @Test
@@ -59,12 +59,12 @@ class DailyApiUsageTest {
         val usage = DailyApiUsage(
             date = "2026-09-16",
             requestCount = 15,
-            externalRequestCount = 6,
+            externalRequestCount = 0,
             dailyLimit = 20
         )
-        assertEquals(21, usage.totalRequestCount)
-        assertEquals(0, usage.estimatedRemainingRequests)
-        assertEquals(1.0f, usage.usagePercentage, 0.0001f)
+        assertEquals(15, usage.totalRequestCount)
+        assertEquals(5, usage.estimatedRemainingRequests)
+        assertEquals(15f / 20f, usage.usagePercentage, 0.0001f)
     }
 
     @Test

@@ -68,6 +68,7 @@
     </queries>
 
     <application
+        android:usesCleartextTraffic="true"
         android:name=".MacroBiteApp"
         android:allowBackup="true"
         android:requestLegacyExternalStorage="true"

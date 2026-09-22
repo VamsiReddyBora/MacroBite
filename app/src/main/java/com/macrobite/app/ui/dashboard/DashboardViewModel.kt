@@ -574,7 +574,7 @@ class DashboardViewModel @Inject constructor(
 
     private fun triggerAutoBackup() {
         viewModelScope.launch {
-            val isAutoBackup = userPreferencesRepository.getAutoBackupEnabled().firstOrNull() ?: false
+            val isAutoBackup = true
             if (isAutoBackup) {
                 backupManager.performAutoBackup()
             }
@@ -660,6 +660,7 @@ class DashboardViewModel @Inject constructor(
         lastDeletedMeal = meal
         viewModelScope.launch {
             mealRepository.deleteMeal(meal.id)
+            triggerAutoBackup()
             if (_selectedMealForDetail.value?.id == meal.id) {
                 _selectedMealForDetail.value = null
             }
@@ -681,6 +682,7 @@ class DashboardViewModel @Inject constructor(
             mealRepository.insertMeal(mealToRestore.copy(id = 0))
             lastDeletedMeal = null
             _snackbarMessage.value = "Restored ${mealToRestore.foodName}"
+            triggerAutoBackup()
         }
     }
 

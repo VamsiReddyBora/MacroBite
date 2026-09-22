@@ -422,6 +422,47 @@ class BackupManager @Inject constructor(
         }
     }
 
+    suspend fun hasAutoBackup(): Boolean = withContext(Dispatchers.IO) {
+        val candidates = mutableListOf<java.io.File>()
+        val internalDir = java.io.File(context.filesDir, "backups")
+        if (internalDir.exists()) {
+            internalDir.listFiles()?.filter { it.name.endsWith(".json") }?.let { candidates.addAll(it) }
+        }
+        val docsDir = java.io.File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "MacroBite")
+        if (docsDir.exists()) {
+            docsDir.listFiles()?.filter { it.name.endsWith(".json") }?.let { candidates.addAll(it) }
+        }
+        val downloadsDir = java.io.File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "MacroBite")
+        if (downloadsDir.exists()) {
+            downloadsDir.listFiles()?.filter { it.name.endsWith(".json") }?.let { candidates.addAll(it) }
+        }
+        val docsRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+        if (docsRoot.exists()) {
+            docsRoot.listFiles()?.filter { it.name.contains("MacroBite") && it.name.endsWith(".json") }?.let { candidates.addAll(it) }
+        }
+        val downloadsRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        if (downloadsRoot.exists()) {
+            downloadsRoot.listFiles()?.filter { it.name.contains("MacroBite") && it.name.endsWith(".json") }?.let { candidates.addAll(it) }
+        }
+        var mediaStoreHasBackup = false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val projection = arrayOf(MediaStore.Files.FileColumns._ID)
+            val selection = "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE ? AND ${MediaStore.Files.FileColumns.MIME_TYPE} = ?"
+            val selectionArgs = arrayOf("%MacroBite%.json", "application/json")
+            try {
+                context.contentResolver.query(
+                    MediaStore.Files.getContentUri("external"),
+                    projection, selection, selectionArgs, null
+                )?.use { cursor ->
+                    if (cursor.count > 0) {
+                        mediaStoreHasBackup = true
+                    }
+                }
+            } catch (e: Exception) {}
+        }
+        candidates.isNotEmpty() || mediaStoreHasBackup
+    }
+
     suspend fun restoreLatestBackupAuto(): RestoreResult = withContext(Dispatchers.IO) {
         try {
             data class Candidate(

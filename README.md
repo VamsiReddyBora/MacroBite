@@ -15,7 +15,7 @@ A minimalist, privacy-first Android macro and calorie tracker built with 100% Je
 
 Get the pre-compiled Android release APK directly:
 
-👉 **[Download Latest MacroBite.apk (v1.2.0)](https://github.com/VamsiReddyBora/MacroBite/releases/download/v1.2.0/MacroBite.apk)**
+👉 **[Download Latest MacroBite.apk (v1.3.0)](https://github.com/VamsiReddyBora/MacroBite/releases/download/v1.3.0/MacroBite.apk)**
 
 Or visit the **[Releases Tab](https://github.com/VamsiReddyBora/MacroBite/releases)** to view all versions and changelogs.
 
@@ -28,7 +28,8 @@ Or visit the **[Releases Tab](https://github.com/VamsiReddyBora/MacroBite/releas
 | 🎯 **Macro Gauge** | Segmented calorie ring (`/ 3,000 kcal`) + Protein, Carbs & Fats bars | Instant visual feedback on remaining macros |
 | 🎙️ **Multimodal Logging** | Plain text (*"2 eggs + toast"*), voice mic ripple, camera photos & 1-tap presets | Log any meal in 2–3 seconds |
 | 🏷️ **Barcode Memory** | OpenFoodFacts scanner + photo fallback for unlisted packages | Snapping an unknown label saves the barcode locally forever |
-| 📊 **Rate Limits & Cross-App Sync** | Live Google AI Studio matrix (RPM, TPM, RPD) + cross-app request counter | 100% synchronized shared 500 RPD counter matching AI Studio |
+| 🌐 **Custom API & Self-Hosting** | OpenAI-compatible custom Base URL (Tailscale, Local, Ollama, vLLM) + Google Gemini | Full control: self-host your own LLM backend or use Google AI |
+| 📊 **Live Quota & Auto-Backup** | Live Gemini API quota probe + fully automatic silent local backup & restore | Seamless data persistence across installs with 1-tap restore |
 | 📲 **Home Screen Widget** | Static home bar for background text & voice logging | Zero app launch, zero screen flash, silent background logging |
 | 🤖 **AI Assistant & Copilot** | Atwater nutrition calculations + hands-free actions (*Calls, Timers, WhatsApp, Maps*) | Nutrition intelligence + device automation in one |
 | 👥 **Contact Aliases** | Nickname mapping (e.g., `"dad"` ➔ `"Daddy"`) | Direct voice dialing without disambiguation prompts |
@@ -60,9 +61,17 @@ The compiled APK will be at `app/build/outputs/apk/release/MacroBite.apk`.
 MacroBite works 100% offline using its built-in local food dictionary.
 
 To enable multimodal photo scanning and conversational AI advice:
+
+### Option A: Google Gemini API (Free)
 1. Get a free API key at [Google AI Studio](https://aistudio.google.com/).
-2. Open **MacroBite ➔ Settings ➔ Gemini AI Settings**.
+2. Open **MacroBite ➔ Settings ➔ AI Settings**.
 3. Paste your key and tap **Save Key**.
+
+### Option B: Custom / Self-Hosted Backend (OpenAI-Compatible)
+1. Open **MacroBite ➔ Settings ➔ AI Settings**.
+2. Enter your custom Base URL (e.g. `http://<tailscale-ip>:8000/v1` or `http://localhost:11434/v1`).
+3. (Optional) Specify your model name (e.g. `Gemini 3.8 Flash (Low)`, `llama3`, `mistral`).
+4. Enter your API Key or Bearer Token and tap **Test Connection** / **Save Key**. Cleartext HTTP is fully supported for local/Tailscale IPs.
 
 ---
 

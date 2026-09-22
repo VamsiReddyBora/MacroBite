@@ -63,107 +63,17 @@ import com.macrobite.app.ui.theme.ProteinBlue
 import java.text.NumberFormat
 import java.util.Locale
 
-private data class ModelRateLimitInfo(
-    val id: String,
-    val name: String,
-    val isRecommended: Boolean,
-    val rpm: Int,
-    val tpm: String,
-    val rpd: Int,
-    val peakUsage: String,
-    val peakPercentage: String,
-    val isExceeded: Boolean = false,
-    val description: String
-)
-
-private val officialGeminiRateLimits = listOf(
-    ModelRateLimitInfo(
-        id = "gemini-3.5-flash-lite",
-        name = "Gemini 3.5 Flash-Lite",
-        isRecommended = true,
-        rpm = 15,
-        tpm = "250K",
-        rpd = 500,
-        peakUsage = "40 / 500 RPD",
-        peakPercentage = "8.00%",
-        isExceeded = false,
-        description = "⭐ Recommended · Highest quota & lowest latency for macro tracking"
-    ),
-    ModelRateLimitInfo(
-        id = "gemini-3.1-flash-lite",
-        name = "Gemini 3.1 Flash-Lite",
-        isRecommended = true,
-        rpm = 15,
-        tpm = "250K",
-        rpd = 500,
-        peakUsage = "8 / 500 RPD",
-        peakPercentage = "1.60%",
-        isExceeded = false,
-        description = "⭐ Recommended · Lightweight, highly reliable alternative"
-    ),
-    ModelRateLimitInfo(
-        id = "gemini-3.5-flash",
-        name = "Gemini 3.5 Flash",
-        isRecommended = false,
-        rpm = 5,
-        tpm = "250K",
-        rpd = 20,
-        peakUsage = "21 / 20 RPD",
-        peakPercentage = "105.00%",
-        isExceeded = true,
-        description = "Limited · Strict 20 RPD daily quota (Cap reached in testing)"
-    ),
-    ModelRateLimitInfo(
-        id = "gemini-3.6-flash",
-        name = "Gemini 3.6 Flash",
-        isRecommended = false,
-        rpm = 5,
-        tpm = "250K",
-        rpd = 20,
-        peakUsage = "23 / 20 RPD",
-        peakPercentage = "115.00%",
-        isExceeded = true,
-        description = "Limited · Strict 20 RPD daily quota (Cap reached in testing)"
-    ),
-    ModelRateLimitInfo(
-        id = "gemini-3.7-flash",
-        name = "Gemini 3.7 Flash",
-        isRecommended = false,
-        rpm = 5,
-        tpm = "250K",
-        rpd = 20,
-        peakUsage = "0 / 20 RPD",
-        peakPercentage = "0.00%",
-        isExceeded = false,
-        description = "Limited · 20 requests/day cap on Free Tier"
-    ),
-    ModelRateLimitInfo(
-        id = "gemini-3.8-flash",
-        name = "Gemini 3.8 Flash",
-        isRecommended = false,
-        rpm = 5,
-        tpm = "250K",
-        rpd = 20,
-        peakUsage = "0 / 20 RPD",
-        peakPercentage = "0.00%",
-        isExceeded = false,
-        description = "Limited · 20 requests/day cap on Free Tier"
-    )
-)
 
 @Composable
 fun GeminiApiUsageCard(
     usage: DailyApiUsage,
     activeModel: String = "gemini-3.5-flash-lite",
-    onAddExternalRequests: (Int) -> Unit = {},
-    onSetExternalRequests: (Int) -> Unit = {},
-    onResetUsage: () -> Unit = {},
+    onRefreshQuota: () -> Unit = {},
+    liveQuotaStatus: SettingsViewModel.LiveQuotaStatus = SettingsViewModel.LiveQuotaStatus(),
     isScreenActive: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     var isExpanded by remember { mutableStateOf(false) }
-    var showCustomDialog by remember { mutableStateOf(false) }
-    var customCountInput by remember { mutableStateOf("") }
 
     val numberFmt = remember { NumberFormat.getNumberInstance(Locale.US) }
     val uriHandler = LocalUriHandler.current
@@ -444,13 +354,29 @@ fun GeminiApiUsageCard(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // SECTION 1: Cross-App & AI Studio Sync Control
+                    // SECTION 1: Live API Status & Quota Check
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(14.dp))
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
-                            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)), RoundedCornerShape(14.dp))
+                            .background(
+                                when {
+                                    liveQuotaStatus.isRateLimited -> FatsCoral.copy(alpha = 0.08f)
+                                    liveQuotaStatus.isApiAlive == true -> CarbsGreen.copy(alpha = 0.08f)
+                                    else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
+                                }
+                            )
+                            .border(
+                                BorderStroke(
+                                    1.dp,
+                                    when {
+                                        liveQuotaStatus.isRateLimited -> FatsCoral.copy(alpha = 0.3f)
+                                        liveQuotaStatus.isApiAlive == true -> CarbsGreen.copy(alpha = 0.3f)
+                                        else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                                    }
+                                ),
+                                RoundedCornerShape(14.dp)
+                            )
                             .padding(12.dp)
                     ) {
                         Column {
@@ -460,46 +386,88 @@ fun GeminiApiUsageCard(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.ic_apps),
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(16.dp)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                when {
+                                                    liveQuotaStatus.isProbing -> MaterialTheme.colorScheme.primary
+                                                    liveQuotaStatus.isRateLimited -> FatsCoral
+                                                    liveQuotaStatus.isApiAlive == true -> CarbsGreen
+                                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                                }
+                                            )
                                     )
-                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "Cross-App & AI Studio Sync",
+                                        text = "Live API Status",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "Live Shared Counter",
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (liveQuotaStatus.lastProbeTime != null) {
+                                        Text(
+                                            text = "Last: ${liveQuotaStatus.lastProbeTime}",
+                                            fontSize = 9.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(
+                                                when {
+                                                    liveQuotaStatus.isProbing -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                                    liveQuotaStatus.isRateLimited -> FatsCoral.copy(alpha = 0.15f)
+                                                    liveQuotaStatus.isApiAlive == true -> CarbsGreen.copy(alpha = 0.15f)
+                                                    else -> MaterialTheme.colorScheme.surfaceVariant
+                                                }
+                                            )
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = when {
+                                                liveQuotaStatus.isProbing -> "Checking..."
+                                                liveQuotaStatus.isRateLimited -> "❌ Quota Exhausted"
+                                                liveQuotaStatus.isApiAlive == true -> "✅ API Active"
+                                                liveQuotaStatus.errorMessage != null -> "⚠️ Error"
+                                                else -> "Unknown"
+                                            },
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = when {
+                                                liveQuotaStatus.isProbing -> MaterialTheme.colorScheme.primary
+                                                liveQuotaStatus.isRateLimited -> FatsCoral
+                                                liveQuotaStatus.isApiAlive == true -> CarbsGreen
+                                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                            }
+                                        )
+                                    }
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(6.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
+                            // Status message
                             Text(
-                                text = "Google does not provide a public API endpoint to query external AI Studio counts using an API key. MacroBite merges your external calls with in-app requests so your live total stays completely synchronized with Google AI Studio.",
+                                text = when {
+                                    liveQuotaStatus.isProbing -> "Probing Google Gemini API to verify quota availability..."
+                                    liveQuotaStatus.isRateLimited -> "Your daily RPD quota is exhausted. The API will reject new requests until midnight Pacific Time reset."
+                                    liveQuotaStatus.isApiAlive == true -> "Your API key is active and accepting requests. Quota has not been exhausted."
+                                    liveQuotaStatus.errorMessage != null -> "Error: ${liveQuotaStatus.errorMessage}"
+                                    else -> "Tap 'Check Now' to probe the API and verify your current quota status."
+                                },
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 14.sp),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            // Breakdown Pill: App + External = Total
+                            // Breakdown Pill: App requests from today
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -510,31 +478,13 @@ fun GeminiApiUsageCard(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "MacroBite: ${usage.requestCount} call${if (usage.requestCount != 1) "s" else ""}",
+                                    text = "MacroBite Today: ${usage.requestCount} request${if (usage.requestCount != 1) "s" else ""}",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    text = "+",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = "External: ${usage.externalRequestCount} call${if (usage.externalRequestCount != 1) "s" else ""}",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    text = "=",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = "${usage.totalRequestCount} / ${usage.dailyLimit}",
+                                    text = "${usage.requestCount} / ${usage.dailyLimit} RPD",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = if (usage.estimatedRemainingRequests == 0) FatsCoral else CarbsGreen
@@ -543,406 +493,53 @@ fun GeminiApiUsageCard(
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            // Stepper & Quick Adjustment Controls
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                OutlinedButton(
-                                    onClick = { onAddExternalRequests(-1) },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(8.dp),
-                                    border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant)
-                                ) {
-                                    Text("-1", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                }
-
-                                Button(
-                                    onClick = {
-                                        customCountInput = usage.externalRequestCount.toString()
-                                        showCustomDialog = true
-                                    },
-                                    modifier = Modifier.weight(2f),
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                        contentColor = MaterialTheme.colorScheme.onSurface
-                                    )
-                                ) {
-                                    Text(
-                                        text = "${usage.externalRequestCount} Ext Calls (Set)",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 11.sp
-                                    )
-                                }
-
-                                OutlinedButton(
-                                    onClick = { onAddExternalRequests(1) },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(8.dp),
-                                    border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant)
-                                ) {
-                                    Text("+1", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                }
-
-                                OutlinedButton(
-                                    onClick = { onAddExternalRequests(5) },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(8.dp),
-                                    border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant)
-                                ) {
-                                    Text("+5", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // 1-Tap Check Google AI Studio Dashboard
+                            // Check Now & Open Dashboard buttons
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Button(
+                                    onClick = onRefreshQuota,
+                                    enabled = !liveQuotaStatus.isProbing,
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary
+                                    ),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_speed),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        text = if (liveQuotaStatus.isProbing) "Checking..." else "Check Now",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
                                 TextButton(
                                     onClick = {
                                         uriHandler.openUri("https://aistudio.google.com/rate-limit")
-                                    }
+                                    },
+                                    modifier = Modifier.weight(1f)
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            painter = painterResource(id = R.drawable.ic_speed),
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(5.dp))
-                                        Text(
-                                            text = "Open AI Studio Rate Limit Dashboard",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // SECTION 2: Detailed token breakdown row
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f))
-                            .border(BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant), RoundedCornerShape(12.dp))
-                            .padding(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            // Prompt Tokens
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Prompt (Input)",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = numberFmt.format(usage.promptTokens),
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
-                                    color = ProteinBlue
-                                )
-                                Text(
-                                    text = "Food & Images",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            // Candidate Tokens
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Output (AI)",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = numberFmt.format(usage.candidateTokens),
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
-                                    color = CarbsGreen
-                                )
-                                Text(
-                                    text = "Nutrition JSON",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            // Average per call
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Avg / Call",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = numberFmt.format(usage.averageTokensPerRequest),
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    text = "Tokens/Request",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // SECTION 3: Google AI Studio Rate Limits & Peak Usage Table
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text(
-                                text = "Model Rate Limits & History",
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Google AI Studio Free Tier Quotas & Peak Usage",
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f))
-                            .border(BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant), RoundedCornerShape(12.dp))
-                            .padding(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        officialGeminiRateLimits.forEach { modelInfo ->
-                            val isCurrentActive = activeModel == modelInfo.id
-
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(
-                                        if (isCurrentActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-                                        else MaterialTheme.colorScheme.surface
-                                    )
-                                    .border(
-                                        BorderStroke(
-                                            if (isCurrentActive) 1.dp else 0.5.dp,
-                                            if (isCurrentActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-                                            else MaterialTheme.colorScheme.outlineVariant
-                                        ),
-                                        RoundedCornerShape(8.dp)
-                                    )
-                                    .padding(8.dp)
-                            ) {
-                                Column {
-                                    // Row 1: Name and Badges
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                text = modelInfo.name,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 12.sp,
-                                                color = if (isCurrentActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                            )
-                                            if (isCurrentActive) {
-                                                Spacer(modifier = Modifier.width(5.dp))
-                                                Box(
-                                                    modifier = Modifier
-                                                        .clip(RoundedCornerShape(3.dp))
-                                                        .background(MaterialTheme.colorScheme.primary)
-                                                        .padding(horizontal = 4.dp, vertical = 1.dp)
-                                                ) {
-                                                    Text(
-                                                        text = "Active",
-                                                        fontSize = 8.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = MaterialTheme.colorScheme.onPrimary
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        // Badge
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(4.dp))
-                                                .background(
-                                                    if (modelInfo.isRecommended) CarbsGreen.copy(alpha = 0.15f)
-                                                    else FatsCoral.copy(alpha = 0.15f)
-                                                )
-                                                .padding(horizontal = 5.dp, vertical = 2.dp)
-                                        ) {
-                                            Text(
-                                                text = if (modelInfo.isRecommended) "⭐ Recommended" else "⚠️ 20 RPD Cap",
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (modelInfo.isRecommended) CarbsGreen else FatsCoral
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(4.dp))
-
-                                    // Row 2: Rate limits (RPM, TPM, RPD)
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "Limits: ${modelInfo.rpm} RPM • ${modelInfo.tpm} TPM • ${modelInfo.rpd} RPD",
-                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Text(
-                                            text = "Peak: ${modelInfo.peakUsage} (${modelInfo.peakPercentage})",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 10.sp
-                                            ),
-                                            color = if (modelInfo.isExceeded) FatsCoral else MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(2.dp))
-
-                                    // Row 3: Description Note
                                     Text(
-                                        text = modelInfo.description,
-                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        text = "Open AI Studio ↗",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                 }
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // SECTION 4: Official Quota Policy & Automatic Midnight Reset
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-                            .border(
-                                BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                                RoundedCornerShape(10.dp)
-                            )
-                            .padding(horizontal = 12.dp, vertical = 10.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text(
-                                    text = "Official Google AI Studio Quota",
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 11.5.sp
-                                    ),
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "Quota is linked to your Google API account. Stats cannot be manually cleared and auto-refresh daily at 00:00 UTC / Midnight.",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 10.sp,
-                                        lineHeight = 13.sp
-                                    ),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
-
-    // Custom External Count Dialog
-    if (showCustomDialog) {
-        AlertDialog(
-            onDismissRequest = { showCustomDialog = false },
-            title = {
-                Text(
-                    text = "Sync External Requests",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
-            },
-            text = {
-                Column {
-                    Text(
-                        text = "Enter total requests consumed outside MacroBite today (e.g. in AI Studio or other apps) to match your Google dashboard:",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = customCountInput,
-                        onValueChange = { customCountInput = it.filter { ch -> ch.isDigit() } },
-                        label = { Text("External Request Count") },
-                        placeholder = { Text("e.g. 2 or 40") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val count = customCountInput.toIntOrNull() ?: 0
-                        onSetExternalRequests(count)
-                        showCustomDialog = false
-                    }
-                ) {
-                    Text("Save & Sync")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCustomDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
+}
+}
 }

@@ -56,6 +56,8 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
+    @javax.inject.Inject
+    lateinit var backupManager: com.macrobite.app.data.backup.BackupManager
 
     @Inject
     lateinit var userPreferencesRepository: UserPreferencesRepository
@@ -89,6 +91,9 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         com.macrobite.app.notification.ChatVisibilityTracker.setAppForeground(false)
+        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            backupManager.performAutoBackup()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -180,6 +185,21 @@ class MainActivity : AppCompatActivity() {
                     else -> true // "dark" default per specification
                 }
 
+                val coroutineScope = rememberCoroutineScope()
+                val hasSeenOnboarding by userPreferencesRepository.hasSeenOnboarding().collectAsState(initial = true)
+                var showRestoreDialog by remember { mutableStateOf(false) }
+                var isRestoring by remember { mutableStateOf(false) }
+                LaunchedEffect(hasSeenOnboarding) {
+                    if (!hasSeenOnboarding) {
+                        val hasBackup = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { backupManager.hasAutoBackup() }
+                        if (hasBackup) {
+                            showRestoreDialog = true
+                        } else {
+                            userPreferencesRepository.setHasSeenOnboarding(true)
+                        }
+                    }
+                }
+
                 var appReady by remember { mutableStateOf(false) }
                 LaunchedEffect(Unit) {
                     kotlinx.coroutines.delay(60)
@@ -201,6 +221,48 @@ class MainActivity : AppCompatActivity() {
                             .background(Color.Black)
                             .graphicsLayer { alpha = contentAlpha }
                     ) {
+                        if (showRestoreDialog) {
+                            androidx.compose.material3.AlertDialog(
+                                onDismissRequest = { },
+                                title = { androidx.compose.material3.Text("Backup Found") },
+                                text = {
+                                    if (isRestoring) {
+                                        androidx.compose.material3.Text("Restoring your data...")
+                                    } else {
+                                        androidx.compose.material3.Text("We found a previous MacroBite backup on your device. Would you like to restore all your data (meals, chats, targets) or start fresh?")
+                                    }
+                                },
+                                confirmButton = {
+                                    androidx.compose.material3.Button(
+                                        enabled = !isRestoring,
+                                        onClick = {
+                                            isRestoring = true
+                                            coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                                backupManager.restoreLatestBackupAuto()
+                                                userPreferencesRepository.setHasSeenOnboarding(true)
+                                                showRestoreDialog = false
+                                            }
+                                        }
+                                    ) {
+                                        androidx.compose.material3.Text("Restore Data")
+                                    }
+                                },
+                                dismissButton = {
+                                    androidx.compose.material3.OutlinedButton(
+                                        enabled = !isRestoring,
+                                        onClick = {
+                                            coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                                userPreferencesRepository.setHasSeenOnboarding(true)
+                                                showRestoreDialog = false
+                                            }
+                                        }
+                                    ) {
+                                        androidx.compose.material3.Text("Fresh Start")
+                                    }
+                                }
+                            )
+                        }
+
                         MacroBiteAppMain(
                             targetPageFlow = targetPageFlow,
                             widgetActionFlow = widgetActionFlow,

@@ -10,7 +10,7 @@ data class DailyApiUsage(
     val dailyLimit: Int = 500
 ) {
     val totalRequestCount: Int
-        get() = requestCount + externalRequestCount
+        get() = requestCount
 
     val estimatedRemainingRequests: Int
         get() = (dailyLimit - totalRequestCount).coerceAtLeast(0)

@@ -6,10 +6,16 @@ import kotlinx.coroutines.flow.Flow
 
 interface UserPreferencesRepository {
     fun getTargets(): Flow<UserTargets>
+    fun hasSeenOnboarding(): Flow<Boolean>
+    suspend fun setHasSeenOnboarding(seen: Boolean)
     suspend fun saveTargets(targets: UserTargets)
     fun getUseGemini(): Flow<Boolean>
     suspend fun setUseGemini(enabled: Boolean)
     fun getGeminiApiKey(): Flow<String>
+    fun getCustomApiBaseUrl(): Flow<String>
+    suspend fun setCustomApiBaseUrl(url: String)
+    fun getCustomApiModel(): Flow<String>
+    suspend fun setCustomApiModel(model: String)
     suspend fun setGeminiApiKey(apiKey: String)
     fun getDarkModePreference(): Flow<String> // "system", "dark", "light"
     suspend fun setDarkModePreference(mode: String)

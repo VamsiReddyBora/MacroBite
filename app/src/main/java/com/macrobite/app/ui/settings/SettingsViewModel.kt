@@ -3,6 +3,7 @@ package com.macrobite.app.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.ai.client.generativeai.GenerativeModel
+import com.google.ai.client.generativeai.type.content
 import com.macrobite.app.domain.model.AppDate
 import com.macrobite.app.domain.model.DailyApiUsage
 import com.macrobite.app.domain.model.UserTargets
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import com.macrobite.app.notification.AiWellWisherCoach
 import javax.inject.Inject
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 data class SettingsUiState(
     val targets: UserTargets = UserTargets(),
@@ -100,6 +102,11 @@ class SettingsViewModel @Inject constructor(
     val useGemini: StateFlow<Boolean> = userPreferencesRepository.getUseGemini()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
+    val customApiBaseUrl: StateFlow<String> = userPreferencesRepository.getCustomApiBaseUrl()
+        .stateIn(viewModelScope, SharingStarted.Lazily, "")
+    val customApiModel: StateFlow<String> = userPreferencesRepository.getCustomApiModel()
+        .stateIn(viewModelScope, SharingStarted.Lazily, "")
+
     val geminiApiKey: StateFlow<String> = userPreferencesRepository.getGeminiApiKey()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
 
@@ -151,6 +158,64 @@ class SettingsViewModel @Inject constructor(
 
     private val _saveMessage = MutableStateFlow<String?>(null)
     val saveMessage: StateFlow<String?> = _saveMessage.asStateFlow()
+
+    data class LiveQuotaStatus(
+        val isProbing: Boolean = false,
+        val isApiAlive: Boolean? = null,
+        val lastProbeTime: String? = null,
+        val errorMessage: String? = null,
+        val isRateLimited: Boolean = false
+    )
+
+    private val _liveQuotaStatus = MutableStateFlow(LiveQuotaStatus())
+    val liveQuotaStatus: StateFlow<LiveQuotaStatus> = _liveQuotaStatus.asStateFlow()
+
+    fun refreshLiveQuotaStatus() {
+        viewModelScope.launch {
+            val apiKey = geminiApiKey.value.trim()
+            if (apiKey.isBlank()) {
+                _liveQuotaStatus.value = LiveQuotaStatus(
+                    isProbing = false,
+                    isApiAlive = null,
+                    errorMessage = "No API key configured"
+                )
+                return@launch
+            }
+
+            _liveQuotaStatus.value = _liveQuotaStatus.value.copy(isProbing = true, errorMessage = null)
+
+            try {
+                val currentModel = geminiModel.value.ifBlank { "gemini-3.5-flash-lite" }
+                val model = GenerativeModel(
+                    modelName = currentModel,
+                    apiKey = apiKey
+                )
+                // countTokens does NOT count against RPD quota
+                val tokenResponse = model.countTokens(content { text("test") })
+                val now = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+                _liveQuotaStatus.value = LiveQuotaStatus(
+                    isProbing = false,
+                    isApiAlive = true,
+                    lastProbeTime = now,
+                    isRateLimited = false
+                )
+            } catch (e: Exception) {
+                val msg = e.localizedMessage ?: e.message ?: "Unknown error"
+                val isRateLimited = msg.contains("RESOURCE_EXHAUSTED", ignoreCase = true) ||
+                        msg.contains("429", ignoreCase = true) ||
+                        msg.contains("quota", ignoreCase = true) ||
+                        msg.contains("rate limit", ignoreCase = true)
+                val now = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+                _liveQuotaStatus.value = LiveQuotaStatus(
+                    isProbing = false,
+                    isApiAlive = !isRateLimited,
+                    lastProbeTime = now,
+                    isRateLimited = isRateLimited,
+                    errorMessage = if (isRateLimited) "Daily quota exhausted (429)" else msg
+                )
+            }
+        }
+    }
 
     fun saveTargets(calories: Int, protein: Int, carbs: Int, fats: Int) {
         viewModelScope.launch {
@@ -205,6 +270,18 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun setCustomApiBaseUrl(url: String) {
+        viewModelScope.launch {
+            userPreferencesRepository.setCustomApiBaseUrl(url)
+        }
+    }
+
+    fun setCustomApiModel(model: String) {
+        viewModelScope.launch {
+            userPreferencesRepository.setCustomApiModel(model)
+        }
+    }
+
     fun saveGeminiApiKey(key: String) {
         viewModelScope.launch {
             userPreferencesRepository.setGeminiApiKey(key)
@@ -212,7 +289,7 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun testGeminiConnection(key: String) {
+    fun testGeminiConnection(key: String, customBaseUrl: String, customModel: String) {
         val apiKeyToTest = key.trim()
         if (apiKeyToTest.isBlank()) {
             _apiTestMessage.value = "Please enter an API key to test."
@@ -222,6 +299,65 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             _isTestingApi.value = true
             _apiTestMessage.value = null
+
+            if (customBaseUrl.isNotBlank()) {
+                val rawUrl = customBaseUrl.trim()
+                val fullUrl = if (!rawUrl.startsWith("http://") && !rawUrl.startsWith("https://")) {
+                    "http://$rawUrl"
+                } else {
+                    rawUrl
+                }
+                val cleanBase = fullUrl.removeSuffix("/")
+                val endpoint = if (cleanBase.endsWith("/chat/completions")) {
+                    cleanBase
+                } else if (cleanBase.endsWith("/v1")) {
+                    "$cleanBase/chat/completions"
+                } else {
+                    "$cleanBase/v1/chat/completions"
+                }
+                val targetModel = customModel.ifBlank { "Gemini 3.8 Flash (Low)" }
+                try {
+                    val requestUrl = endpoint.toHttpUrlOrNull()
+                    if (requestUrl == null) throw IllegalArgumentException("Invalid URL: $endpoint")
+                    val url = requestUrl.toUrl()
+                    val conn = url.openConnection() as java.net.HttpURLConnection
+                    conn.requestMethod = "POST"
+                    conn.setRequestProperty("Authorization", "Bearer $apiKeyToTest")
+                    conn.setRequestProperty("Content-Type", "application/json")
+                    conn.doOutput = true
+                    conn.doInput = true
+
+                    val jsonPayload = com.google.gson.JsonObject()
+                    jsonPayload.addProperty("model", targetModel)
+                    val messagesArray = com.google.gson.JsonArray()
+                    val messageObj = com.google.gson.JsonObject()
+                    messageObj.addProperty("role", "user")
+                    messageObj.addProperty("content", "ping")
+                    messagesArray.add(messageObj)
+                    jsonPayload.add("messages", messagesArray)
+
+                    val payloadString = jsonPayload.toString()
+                    conn.outputStream.use { os ->
+                        val input = payloadString.toByteArray(Charsets.UTF_8)
+                        os.write(input, 0, input.size)
+                    }
+
+                    val responseCode = conn.responseCode
+                    if (responseCode in 200..299) {
+                        _apiTestMessage.value = "Connection successful! Custom model is active."
+                        userPreferencesRepository.setGeminiApiKey(apiKeyToTest)
+                        userPreferencesRepository.setUseGemini(true)
+                    } else {
+                        val errorStr = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                        _apiTestMessage.value = "Custom API Test failed ($responseCode): $errorStr"
+                    }
+                } catch (e: Exception) {
+                    _apiTestMessage.value = "Custom API Test failed: ${e.localizedMessage ?: e.message}"
+                }
+                _isTestingApi.value = false
+                return@launch
+            }
+
             val rawCurrent = geminiModel.value
             val current = if (rawCurrent == "gemini-3.7-flash" || rawCurrent.isBlank()) "gemini-3.5-flash-lite" else rawCurrent
             val baseModels = listOf(

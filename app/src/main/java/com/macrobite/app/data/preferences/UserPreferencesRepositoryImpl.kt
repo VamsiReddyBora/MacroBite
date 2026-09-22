@@ -45,6 +45,8 @@ class UserPreferencesRepositoryImpl @Inject constructor(
         val TARGET_FATS = intPreferencesKey("target_fats")
         val USE_GEMINI = booleanPreferencesKey("use_gemini")
         val GEMINI_API_KEY = stringPreferencesKey("gemini_api_key")
+        val CUSTOM_API_BASE_URL = stringPreferencesKey("custom_api_base_url")
+        val CUSTOM_API_MODEL = stringPreferencesKey("custom_api_model")
         val DARK_MODE = stringPreferencesKey("dark_mode")
         val GEMINI_MODEL = stringPreferencesKey("gemini_model")
         val DAILY_USAGE_DATE = stringPreferencesKey("daily_usage_date")
@@ -87,6 +89,7 @@ class UserPreferencesRepositoryImpl @Inject constructor(
         val CUSTOM_MODELS = stringSetPreferencesKey("custom_models")
         val AUTO_BACKUP = booleanPreferencesKey("auto_backup")
         val CUSTOM_BARCODES_JSON = stringPreferencesKey("custom_barcodes_json")
+        val HAS_SEEN_ONBOARDING = booleanPreferencesKey("has_seen_onboarding")
         val EXTERNAL_REQUEST_DATE = stringPreferencesKey("external_request_date")
         val EXTERNAL_REQUEST_COUNT = intPreferencesKey("external_request_count")
     }
@@ -96,6 +99,11 @@ class UserPreferencesRepositoryImpl @Inject constructor(
             Log.e("UserPrefs", "DataStore read error, defaulting to empty preferences: ${exception.message}")
             emit(emptyPreferences())
         }
+
+    override fun hasSeenOnboarding(): Flow<Boolean> = context.dataStore.data.map { it[PreferencesKeys.HAS_SEEN_ONBOARDING] ?: false }
+    override suspend fun setHasSeenOnboarding(seen: Boolean) {
+        context.dataStore.edit { it[PreferencesKeys.HAS_SEEN_ONBOARDING] = seen }
+    }
 
     override fun getTargets(): Flow<UserTargets> {
         return safePreferencesFlow.map { preferences ->
@@ -137,6 +145,15 @@ class UserPreferencesRepositoryImpl @Inject constructor(
         } catch (e: Throwable) {
             Log.e("UserPrefs", "Failed to set useGemini", e)
         }
+    }
+
+    override fun getCustomApiBaseUrl(): Flow<String> = context.dataStore.data.map { it[PreferencesKeys.CUSTOM_API_BASE_URL] ?: "" }
+    override suspend fun setCustomApiBaseUrl(url: String) {
+        context.dataStore.edit { it[PreferencesKeys.CUSTOM_API_BASE_URL] = url }
+    }
+    override fun getCustomApiModel(): Flow<String> = context.dataStore.data.map { it[PreferencesKeys.CUSTOM_API_MODEL] ?: "" }
+    override suspend fun setCustomApiModel(model: String) {
+        context.dataStore.edit { it[PreferencesKeys.CUSTOM_API_MODEL] = model }
     }
 
     override fun getGeminiApiKey(): Flow<String> {

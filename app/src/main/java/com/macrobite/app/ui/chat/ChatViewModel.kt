@@ -53,6 +53,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 data class ChatFoodPayload(
     val foodName: String,
@@ -485,6 +486,9 @@ class ChatViewModel @Inject constructor(
 
         val useGemini = try { userPreferencesRepository.getUseGemini().first() } catch (e: Exception) { true }
         val apiKey = try { userPreferencesRepository.getGeminiApiKey().first().trim() } catch (e: Exception) { "" }
+        val customBaseUrl = try { userPreferencesRepository.getCustomApiBaseUrl().first().trim() } catch (e: Exception) { "" }
+        val customModel = try { userPreferencesRepository.getCustomApiModel().first().trim() } catch (e: Exception) { "" }
+
         if (!useGemini || apiKey.isBlank()) {
             if (localAction != null) {
                 val responseMsg = when (localAction.actionType) {
@@ -664,11 +668,11 @@ class ChatViewModel @Inject constructor(
             - If asked your name, who you are, or in greetings and sign-offs, ALWAYS introduce and refer to yourself strictly as "$currentAiName".
             $personaInstruction
             $dietaryContextPrompt
-            
+
             GENERAL CONVERSATION & VERSATILITY:
             - While your specialty is sports nutrition and fitness, you are also knowledgeable, versatile, and happy to chat about everyday life, current events, movies, entertainment, facts, science, and general questions.
             - When answering general non-food questions (such as movies, daily topics, or trivia), converse naturally and helpfully. Do NOT force a food breakdown or JSON block unless a meal or food is actually discussed.
-            
+
             SCIENTIFIC NUTRITIONAL ACCURACY GUIDELINES:
             - ACCURACY REFERENCE: Calculate macros and calories using verified reference nutritional databases (USDA FoodData Central and Indian Food Composition Tables / NIN).
             - ATWATER ENERGY FORMULA VERIFICATION: Calories must mathematically align with the macronutrient formula:
@@ -686,7 +690,7 @@ class ChatViewModel @Inject constructor(
             - PRECISION: Always use 1-decimal float precision for protein, carbs, fats, fiber, sugar, and saturated fat (e.g. 1.4g, 22.5g, 0.5g). Keep calories as whole numbers (kcal).
             $microsPrompt
             - CLEAN TEXT FORMATTING: Write clean, readable conversational text. DO NOT use triple asterisks (like ***calories***). Use simple bold headers and bullet points (•) where helpful.
-            
+
             $loggingPrompt
 
             $jarvisDeviceActionsPrompt
@@ -704,10 +708,10 @@ class ChatViewModel @Inject constructor(
 
         val fullPrompt = """
             $systemPrompt
-            
+
             Recent conversation:
             $conversationHistory
-            
+
             User's latest message:
             $promptText
         """.trimIndent()
@@ -770,37 +774,103 @@ class ChatViewModel @Inject constructor(
         }
 
         // 2. Generate content with Gemini using promptToUse
-        for (modelName in orderedModels) {
+        if (customBaseUrl.isNotBlank()) {
+            val rawUrl = customBaseUrl.trim()
+            val fullUrl = if (!rawUrl.startsWith("http://") && !rawUrl.startsWith("https://")) {
+                "http://$rawUrl"
+            } else {
+                rawUrl
+            }
+            val cleanBase = fullUrl.removeSuffix("/")
+            val endpoint = if (cleanBase.endsWith("/chat/completions")) {
+                cleanBase
+            } else if (cleanBase.endsWith("/v1")) {
+                "$cleanBase/chat/completions"
+            } else {
+                "$cleanBase/v1/chat/completions"
+            }
+            val targetModel = customModel.ifBlank { "Gemini 3.8 Flash (Low)" }
             try {
-                val model = GenerativeModel(
-                    modelName = modelName,
-                    apiKey = apiKey
-                )
-                val response = if (uploadBitmap != null) {
-                    val inputContent = content {
-                        image(uploadBitmap)
-                        text(promptToUse)
-                    }
-                    model.generateContent(inputContent)
+                val requestUrl = endpoint.toHttpUrlOrNull()
+                if (requestUrl == null) throw IllegalArgumentException("Invalid URL: $endpoint")
+                val url = requestUrl.toUrl()
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Authorization", "Bearer $apiKey")
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.doOutput = true
+                conn.doInput = true
+
+                val jsonPayload = com.google.gson.JsonObject()
+                jsonPayload.addProperty("model", targetModel)
+                val messagesArray = com.google.gson.JsonArray()
+                val messageObj = com.google.gson.JsonObject()
+                messageObj.addProperty("role", "user")
+                val finalPrompt = if (uploadBitmap != null) {
+                    promptToUse + "\n[User attached an image, but this custom endpoint currently only receives text]"
                 } else {
-                    model.generateContent(promptToUse)
+                    promptToUse
                 }
-                val t = response.text
-                if (!t.isNullOrBlank()) {
-                    responseText = t
-                    userPreferencesRepository.incrementModelUsage(modelName)
-                    val promptTokens = (promptToUse.length / 4).coerceAtLeast(1) + (if (uploadBitmap != null) 258 else 0)
-                    val candidateTokens = (t.length / 4).coerceAtLeast(1)
-                    userPreferencesRepository.recordApiUsage(
-                        promptTokens = promptTokens,
-                        candidateTokens = candidateTokens,
-                        totalTokens = promptTokens + candidateTokens
-                    )
-                    break
+                messageObj.addProperty("content", finalPrompt)
+                messagesArray.add(messageObj)
+                jsonPayload.add("messages", messagesArray)
+
+                val payloadString = jsonPayload.toString()
+                conn.outputStream.use { os ->
+                    val input = payloadString.toByteArray(Charsets.UTF_8)
+                    os.write(input, 0, input.size)
+                }
+
+                val responseCode = conn.responseCode
+                if (responseCode in 200..299) {
+                    val responseStr = conn.inputStream.bufferedReader().use { it.readText() }
+                    val responseJson = com.google.gson.JsonParser.parseString(responseStr).asJsonObject
+                    val choices = responseJson.getAsJsonArray("choices")
+                    if (choices.size() > 0) {
+                        val message = choices[0].asJsonObject.getAsJsonObject("message")
+                        responseText = message.get("content").asString
+                    }
+                } else {
+                    val errorStr = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                    throw IllegalStateException("Custom API Error $responseCode: $errorStr")
                 }
             } catch (e: Exception) {
                 lastError = e
             }
+        } else {
+            for (modelName in orderedModels) {
+                try {
+                    val model = GenerativeModel(
+                        modelName = modelName,
+                        apiKey = apiKey
+                    )
+                    val response = if (uploadBitmap != null) {
+                        val inputContent = content {
+                            image(uploadBitmap)
+                            text(promptToUse)
+                        }
+                        model.generateContent(inputContent)
+                    } else {
+                        model.generateContent(promptToUse)
+                    }
+                    val t = response.text
+                    if (!t.isNullOrBlank()) {
+                        responseText = t
+                        userPreferencesRepository.incrementModelUsage(modelName)
+                        val promptTokens = (promptToUse.length / 4).coerceAtLeast(1) + (if (uploadBitmap != null) 258 else 0)
+                        val candidateTokens = (t.length / 4).coerceAtLeast(1)
+                        userPreferencesRepository.recordApiUsage(
+                            promptTokens = promptTokens,
+                            candidateTokens = candidateTokens,
+                            totalTokens = promptTokens + candidateTokens
+                        )
+                        break
+                    }
+                } catch (e: Exception) {
+                    lastError = e
+                }
+            }
+
         }
 
         if (responseText.isNullOrBlank()) {
